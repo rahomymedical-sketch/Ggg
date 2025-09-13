@@ -1,0 +1,103 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v2
+
+    - name: Build APK
+      run: |
+        echo "Building APK..."
+        # إنشاء هيكل المشروع
+        mkdir -p app/src/main/res/layout
+        mkdir -p app/src/main/res/mipmap-anydpi-v26
+        mkdir -p app/src/main/java/com/example/mywebviewapp
+        
+        # نسخ الملفات إلى مواقعها
+        cp AndroidManifest.xml app/src/main/
+        cp activity_main.xml app/src/main/res/layout/
+        cp MainActivity.java app/src/main/java/com/example/mywebviewapp/
+        
+        # إنشاء ملف build.gradle
+        cat > build.gradle << 'EOF'
+        buildscript {
+            repositories {
+                google()
+                mavenCentral()
+            }
+            dependencies {
+                classpath 'com.android.tools.build:gradle:7.2.0'
+            }
+        }
+        
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+        
+        task clean(type: Delete) {
+            delete rootProject.buildDir
+        }
+        EOF
+        
+        cat > app/build.gradle << 'EOF'
+        plugins {
+            id 'com.android.application'
+        }
+        
+        android {
+            compileSdkVersion 32
+            defaultConfig {
+                applicationId "com.example.mywebviewapp"
+                minSdkVersion 21
+                targetSdkVersion 32
+                versionCode 1
+                versionName "1.0"
+            }
+            buildTypes {
+                release {
+                    minifyEnabled false
+                    proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                }
+            }
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_1_8
+                targetCompatibility JavaVersion.VERSION_1_8
+            }
+        }
+        
+        dependencies {
+            implementation 'androidx.appcompat:appcompat:1.4.2'
+            implementation 'com.google.android.material:material:1.6.1'
+            implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+        }
+        EOF
+        
+        # بناء التطبيق
+        chmod +x gradlew
+        ./gradlew assembleDebug
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: app
+        path: app/build/outputs/apk/debug/app-debug.apk
